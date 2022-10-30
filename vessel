@@ -1,0 +1,92 @@
+#!/usr/bin/env xonsh
+
+# vim:set ft=python:
+
+
+import re
+import sys
+import subprocess
+import types
+import inspect
+
+
+$RAISE_SUBPROC_ERROR = True
+
+exe_name = "vessel"
+
+
+def print_usage() -> None:
+    print(f"Usage: {exe_name} <xonsh script>")
+
+
+def load_script(script: str) -> str:
+    with open(script) as f:
+        src = f.read()
+
+    pat = re.compile("#include <(.*)>")
+
+    pos = 0
+    while True:
+        m = pat.search(src, pos=pos)
+        if m is None:
+            break
+
+        pos = m.span()[0] + 1
+        includeFile = m.groups()[0]
+
+        with open(includeFile) as f:
+            src = src.replace(m.group(), f.read())
+
+    return src
+
+
+def compile_script(script: str):
+    m = types.ModuleType('m', 'The m module')
+    sys.modules['m'] = m
+    code = compilex(script)
+    eval(code, m.__dict__)
+    return m
+
+
+def main():
+    if len(sys.argv) != 2:
+        print_usage()
+        sys.exit(1)
+
+    script_path = sys.argv[1]
+    script = load_script(script_path)
+
+    module = compile_script(script)
+
+    #  trace on
+    #  $XONSH_TRACE_SUBPROC = True
+
+    if hasattr(module, 'local') and inspect.isfunction(module.local):
+        print(f"Running script locally")
+        try:
+            module.local()
+        except subprocess.CalledProcessError as exc:
+            print(f"Local script exited with an error: {exc}")
+            sys.exit(1)
+        else:
+            print(f"Local script completed successfully")
+
+    if (
+        hasattr(module, 'REMOTE') and
+        isinstance(module.REMOTE, str) and
+        hasattr(module, 'remote') and
+        inspect.isfunction(module.remote)
+    ):
+        print(f"Running script on {module.REMOTE}")
+        try:
+            r = ![echo -n @(script) | ssh @(module.REMOTE) 'RAISE_SUBPROC_ERROR=True xonsh']
+            print(f"Remote script exited with an error: {r.returncode}")
+        except subprocess.CalledProcessError as exc:
+            print(f"Remote script exited with an error: {exc}")
+            sys.exit(1)
+        else:
+            print(f"Remote script completed successfully")
+
+
+if __name__ == '__main__':
+    main()

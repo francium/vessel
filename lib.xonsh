@@ -1,0 +1,7 @@
+# vim:set ft=python:
+
+import random
+
+def echox(msg: str):
+    echo @(msg)
+    ls -1

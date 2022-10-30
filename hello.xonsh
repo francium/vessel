@@ -1,0 +1,18 @@
+# vim:set ft=python:
+
+#include <lib.xonsh>
+
+import random
+
+REMOTE="francium@192.168.86.115"
+
+def local():
+    sdlkfsalkjd
+    hostname
+
+def remote():
+    oalkdjfd
+    hostname
+
+if __name__ == "__main__":
+    remote()
