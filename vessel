@@ -8,36 +8,81 @@ import sys
 import subprocess
 import types
 import inspect
+from collections import namedtuple
+from configparser import ConfigParser
+from argparse import ArgumentParser
 
 
 $RAISE_SUBPROC_ERROR = True
 
 exe_name = "vessel"
+exe_description = """
+A Xonsh based scripting tool
+""".strip()
 
 
-def print_usage() -> None:
-    print(f"Usage: {exe_name} <xonsh script>")
+CompiledScripts = namedtuple("CompiledScripts", ["local", "remote"])
+Env = dict[str, str]
 
 
-def load_script(script: str) -> str:
-    with open(script) as f:
-        src = f.read()
+def print_ctrl(msg: str) -> None:
+    bold = '\u001b[1m'
+    green = '\u001b[38;5;28m'
+    grey = '\u001b[38;5;245m'
+    reset = '\u001b[0m'
+    print(bold + green + "> " + msg + reset)
 
-    pat = re.compile("#include <(.*)>")
 
+def load_env(env_path: str) -> Env:
+    parser = ConfigParser()
+    parser.read(env_path)
+    return {item[0]: item[1] for item in parser['default'].items()}
+
+
+def render_templates(env: Env, src: str) -> str:
+    pat = re.compile(r"{{\ *(\w+)\ *}}")
     pos = 0
     while True:
         m = pat.search(src, pos=pos)
         if m is None:
             break
-
         pos = m.span()[0] + 1
-        includeFile = m.groups()[0]
-
-        with open(includeFile) as f:
-            src = src.replace(m.group(), f.read())
-
+        env_key = m.groups()[0]
+        env_val = env.get(env_key)
+        if env_val is None:
+            raise ValueError(
+                f"Failed to render \"{m.group()}\": could not find \"{env_key}\" in env"
+            )
+        src = src.replace(m.group(), env_val)
     return src
+
+
+def load_script(env: Env, script_path: str) -> CompiledScripts:
+    with open(script_path) as f:
+        src = f.read()
+
+    src = render_templates(env, src)
+
+    preamble = """
+class VslCtx:
+    def copy(src: str, dest: str) -> None:
+        raise NotImplementedError()
+
+
+vsl_ctx = VslCtx()
+""".strip()
+    bootstrap_local = """
+if __name__ == "__main__":
+    local(vsl_ctx)
+""".strip()
+    bootstrap_remote = """
+if __name__ == "__main__":
+    remote(vsl_ctx)
+""".strip()
+
+    script_local = preamble + "\n" + src + "\n" + bootstrap_local + "\n"
+    script_remote = preamble + "\n" + src + "\n" + bootstrap_remote + "\n"
+    return CompiledScripts(local=script_local, remote=script_remote)
 
 
 def compile_script(script: str):
@@ -49,43 +94,49 @@ def compile_script(script: str):
 
 
 def main():
-    if len(sys.argv) != 2:
-        print_usage()
-        sys.exit(1)
+    parser = ArgumentParser(prog = exe_name, description=exe_description)
+    parser.add_argument('script')
+    parser.add_argument('-e', '--env', required=True)
+    parser.add_argument('-n', '--dry-run', action='store_true')
+    args = parser.parse_args()
 
-    script_path = sys.argv[1]
-    script = load_script(script_path)
+    env = load_env(args.env)
+    script_path = args.script
+    scripts = load_script(env, script_path)
 
-    module = compile_script(script)
+    if args.dry_run:
+        print_ctrl("Compiled local script")
+        print(scripts.local)
+        print_ctrl("Compiled remote script")
+        print(scripts.remote)
+        print_ctrl("Dry run, skipping script execution")
+        return
 
-    #  trace on
-    #  $XONSH_TRACE_SUBPROC = True
+    module = compile_script(scripts.local)
 
     if hasattr(module, 'local') and inspect.isfunction(module.local):
-        print(f"Running script locally")
+        print_ctrl(f"Running script locally")
         try:
-            module.local()
+            #  module.run_local()
+            r = ![echo -n @(scripts.local) | xonsh]
+            print_ctrl(f"Local script exited with {r.returncode}")
         except subprocess.CalledProcessError as exc:
-            print(f"Local script exited with an error: {exc}")
+            print_ctrl(f"Local script exited with an error: {exc}")
             sys.exit(1)
-        else:
-            print(f"Local script completed successfully")
 
     if (
-        hasattr(module, 'REMOTE') and
-        isinstance(module.REMOTE, str) and
+        env.get('ssh') and
         hasattr(module, 'remote') and
         inspect.isfunction(module.remote)
     ):
-        print(f"Running script on {module.REMOTE}")
+        sshTarget = env.get('ssh')
+        print_ctrl(f"Running script on {sshTarget}")
         try:
-            r = ![echo -n @(script) | ssh @(module.REMOTE) 'RAISE_SUBPROC_ERROR=True xonsh']
-            print(f"Remote script exited with an error: {r.returncode}")
+            r = ![echo -n @(scripts.remote) | ssh @(sshTarget) 'RAISE_SUBPROC_ERROR=True xonsh']
+            print_ctrl(f"Remote script exited with {r.returncode}")
         except subprocess.CalledProcessError as exc:
-            print(f"Remote script exited with an error: {exc}")
+            print_ctrl(f"Remote script exited with an error: {exc}")
             sys.exit(1)
-        else:
-            print(f"Remote script completed successfully")
 
 
 if __name__ == '__main__':
