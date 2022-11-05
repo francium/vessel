@@ -61,6 +61,30 @@ Any templated string (`"{{ foo }}"`) will be rendered using an environment
 provided by the user written in [TOML](https://toml.io/en/).
 
 
+### Environment
+A script requires an environment to be able to run. The environment is like a
+configuration that configures vessel and the script for a specific target
+machine.
+
+The environment is specified using the `-e`/`--env` flag and is written in a
+TOML file.
+
+Due to implementation details and constraints, the parsing is done using an INI
+parser, rather than a proper TOML parser. Therefore, only a subset of TOML
+syntax is supported.
+
+A minimal environment file looks like,
+```toml
+[default]
+ssh = user@127.0.0.1
+```
+
+Additional fields can be specified in the `[default]` section if required. Any
+templated string in the script will be rendered using this environment. If a
+templated string can not be rendered due to a missing environment value, vessel
+will exit with an error
+
+
 ### The `ctx` argument
 
 Each function, `local` and `remote`, accepts an argument called `ctx`, which
