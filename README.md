@@ -85,6 +85,16 @@ templated string can not be rendered due to a missing environment value, vessel
 will exit with an error
 
 
+### Environment Values
+
+All the values must be specified in the `[default]` section.
+
+- `ssh`: SSH target (`user@address`)
+- `ssh_port`: SSH port (optional, defaults to `22` if not specified)
+
+All other values can be specified as needed in the script.
+
+
 ### The `ctx` argument
 
 Each function, `local` and `remote`, accepts an argument called `ctx`, which
