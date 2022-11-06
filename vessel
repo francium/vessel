@@ -13,8 +13,6 @@ from configparser import ConfigParser
 from argparse import ArgumentParser
 
 
-$RAISE_SUBPROC_ERROR = True
-
 exe_name = "vessel"
 exe_description = """
 A Xonsh based scripting tool
@@ -27,7 +25,7 @@ Env = dict[str, str]
 
 def print_ctrl(msg: str) -> None:
     bold = '\u001b[1m'
-    green = '\u001b[38;5;28m'
+    green = '\u001b[38;5;34m'
     grey = '\u001b[38;5;245m'
     reset = '\u001b[0m'
     print(bold + green + "> " + msg + reset)
@@ -68,6 +66,15 @@ class VslCtx:
     def copy(src: str, dest: str) -> None:
         raise NotImplementedError()
 
+    def bold(self, text: str) -> str:
+        bold = '\u001b[1m'
+        not_bold = '\u001b[22m'
+        return bold + text + not_bold
+
+    def fg(self, color_code: int, text: str) -> str:
+        color = f'\u001b[38:5:{color_code}m'
+        default = '\u001b[39m'
+        return color + text + default
 
 vsl_ctx = VslCtx()
 """.strip()
@@ -98,23 +105,42 @@ def main():
     parser.add_argument('script')
     parser.add_argument('-e', '--env', required=True)
     parser.add_argument('-n', '--dry-run', action='store_true')
+    parser.add_argument('-v', '--verbose', action='store_true')
     args = parser.parse_args()
+
+    $RAISE_SUBPROC_ERROR = True
+    if args.verbose:
+        $XONSH_TRACE_SUBPROC = True
 
     env = load_env(args.env)
     script_path = args.script
     scripts = load_script(env, script_path)
 
-    if args.dry_run:
+    module = compile_script(scripts.local)
+
+    will_run_local = (
+        hasattr(module, 'local') and
+        inspect.isfunction(module.local)
+    )
+    will_run_remote = (
+        env.get('ssh') and
+        hasattr(module, 'remote') and
+        inspect.isfunction(module.remote)
+    )
+
+    if will_run_local and args.dry_run:
         print_ctrl("Compiled local script")
         print(scripts.local)
+
+    if will_run_remote and args.dry_run:
         print_ctrl("Compiled remote script")
         print(scripts.remote)
         print_ctrl("Dry run, skipping script execution")
+
+    if args.dry_run:
         return
 
-    module = compile_script(scripts.local)
-
-    if hasattr(module, 'local') and inspect.isfunction(module.local):
+    if will_run_local:
         print_ctrl(f"Running script locally")
         try:
             #  module.run_local()
@@ -124,19 +150,29 @@ def main():
             print_ctrl(f"Local script exited with an error: {exc}")
             sys.exit(1)
 
-    if (
-        env.get('ssh') and
-        hasattr(module, 'remote') and
-        inspect.isfunction(module.remote)
-    ):
-        sshTarget = env.get('ssh')
-        print_ctrl(f"Running script on {sshTarget}")
+    if  will_run_remote:
+        ssh_target = env.get('ssh')
+        ssh_port = env.get('ssh_port', '22')
+
+        print_ctrl(f"Copying script to {ssh_target}")
+        remote_script_tmp = '/tmp/vessel_remote.xsh'
+        with open(remote_script_tmp, 'w') as f:
+            f.write(scripts.remote)
+        scp -P @(ssh_port) @(remote_script_tmp) @(ssh_target):@(remote_script_tmp)
+
+        print_ctrl(f"Running script on {ssh_target}")
         try:
-            r = ![echo -n @(scripts.remote) | ssh @(sshTarget) 'RAISE_SUBPROC_ERROR=True xonsh']
+            remote_flags = "RAISE_SUBPROC_ERROR=True"
+            if args.verbose:
+                remote_flags += " XONSH_TRACE_SUBPROC=True"
+
+            r = ![ssh -o LogLevel=QUIET -t @(ssh_target) -p @(ssh_port) @(remote_flags) xonsh @(remote_script_tmp)]
             print_ctrl(f"Remote script exited with {r.returncode}")
         except subprocess.CalledProcessError as exc:
             print_ctrl(f"Remote script exited with an error: {exc}")
             sys.exit(1)
+        finally:
+            rm -f @(remote_script_tmp)
 
 
 if __name__ == '__main__':
