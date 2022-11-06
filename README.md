@@ -99,6 +99,11 @@ All other values can be specified as needed in the script.
 Each function, `local` and `remote`, accepts an argument called `ctx`, which
 provides various utilities to make common tasks easier:
 - `ctx.copy(local_path, remote_path)`
+  - Copies a local file to remote machine (TODO: Not implemented)
+- `ctx.bold(text)`
+  - Applies escape codes to set text as bold when rendered
+- `ctx.fg(color_code, text)`
+  - Applies escape codes to set text foreground color when rendered
 
 
 ### Running
