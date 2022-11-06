@@ -46,10 +46,12 @@ def remote(ctx):
 
 # Start of inserted bootstrap code
 # This is inserted only if running the script locally
-local(vsl_ctx)
+if __name__ == "__main__":
+    local(vsl_ctx)
 
 # This is inserted only if running the script remotely
-remote(vsl_ctx)
+if __name__ == "__main__":
+    remote(vsl_ctx)
 # End of inserted bootstrap code
 ```
 
