@@ -60,7 +60,8 @@ The `local()`, `remote()` and `remote_target` value is used to determine:
 - `remote` and `remote_target`: What gets run remotely and where
 
 Any templated string (`"{{ foo }}"`) will be rendered using an environment
-provided by the user written in [TOML](https://toml.io/en/).
+provided by the user written in an [INI
+file](https://en.wikipedia.org/wiki/INI_file).
 
 
 ### Environment
@@ -68,15 +69,11 @@ A script requires an environment to be able to run. The environment is like a
 configuration that configures vessel and the script for a specific target
 machine.
 
-The environment is specified using the `-e`/`--env` flag and is written in a
-TOML file.
-
-Due to implementation details and constraints, the parsing is done using an INI
-parser, rather than a proper TOML parser. Therefore, only a subset of TOML
-syntax is supported.
+The environment is specified using the `-e`/`--env` flag and is written in an
+INI file.
 
 A minimal environment file looks like,
-```toml
+```ini
 [default]
 ssh = user@127.0.0.1
 ```
@@ -107,5 +104,5 @@ provides various utilities to make common tasks easier:
 ### Running
 
 ```bash
-vessel -e env.toml script.xsh
+vessel -e env.ini script.xsh
 ```
