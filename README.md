@@ -56,6 +56,7 @@ if __name__ == "__main__":
 ```
 
 The `local()`, `remote()` and `remote_target` value is used to determine:
+
 - `local`: What gets run locally
 - `remote` and `remote_target`: What gets run remotely and where
 
@@ -65,6 +66,7 @@ file](https://en.wikipedia.org/wiki/INI_file).
 
 
 ### Environment
+
 A script requires an environment to be able to run. The environment is like a
 configuration that configures vessel and the script for a specific target
 machine.
@@ -73,6 +75,7 @@ The environment is specified using the `-e`/`--env` flag and is written in an
 INI file.
 
 A minimal environment file looks like,
+
 ```ini
 [default]
 ssh = user@127.0.0.1
@@ -98,6 +101,7 @@ All other values can be specified as needed in the script.
 
 Each function, `local` and `remote`, accepts an argument called `ctx`, which
 provides various utilities to make common tasks easier:
+
 - `ctx.copy(local_path, remote_path)`
   - Copies a local file to remote machine (TODO: Not implemented)
 - `ctx.bold(text)`
