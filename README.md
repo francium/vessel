@@ -60,21 +60,19 @@ The `local()`, `remote()` and `remote_target` value is used to determine:
 - `local`: What gets run locally
 - `remote` and `remote_target`: What gets run remotely and where
 
-Any templated string (`"{{ foo }}"`) will be rendered using an environment
-provided by the user written in an [INI
-file](https://en.wikipedia.org/wiki/INI_file).
+Any templated string (`"{{ foo }}"`) will be rendered using a config
+provided by the user written in a INI or TOML file.
 
 
-### Environment
+### Config
 
-A script requires an environment to be able to run. The environment is like a
-configuration that configures vessel and the script for a specific target
-machine.
+A script requires a config to be able to run. The config contains machine
+specific information that vessel and script use.
 
-The environment is specified using the `-e`/`--env` flag and is written in an
-INI file.
+The config is specified using the `-c`/`--conf` flag and is written in an
+simple INI or TOML file.
 
-A minimal environment file looks like,
+A minimal config file looks like,
 
 ```ini
 [default]
@@ -82,12 +80,12 @@ ssh = user@127.0.0.1
 ```
 
 Additional fields can be specified in the `[default]` section if required. Any
-templated string in the script will be rendered using this environment. If a
-templated string can not be rendered due to a missing environment value, vessel
+templated string in the script will be rendered using this config. If a
+templated string can not be rendered due to a missing config value, vessel
 will exit with an error
 
 
-### Environment Values
+### Config Values
 
 All the values must be specified in the `[default]` section.
 
@@ -113,5 +111,5 @@ provides various utilities to make common tasks easier:
 ### Running
 
 ```bash
-vessel -e env.ini script.xsh
+vessel -c conf.ini script.xsh
 ```
